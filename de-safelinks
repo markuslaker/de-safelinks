@@ -1,0 +1,49 @@
+#!/usr/bin/perl
+use v5.10;
+use warnings;
+use strict;
+
+# This reverses the safelinks process that Microsoft Outlook applies to URLs.
+
+# https://www.google.com/search?q=unbound+dns+server&iflsig=AJiK0e8AAAAAYneeeUc6yv5RvNjoTESHjd2R3NIFeObv
+
+# https://nam02.safelinks.protection.outlook.com/?url=https%3A%2F%2Fwww.google.com%2Fsearch%3Fq%3Dunbound%2Bdns%2Bserver%26iflsig%3DAJiK0e8AAAAAYneeeUc6yv5RvNjoTESHjd2R3NIFeObv&data=05%7C01%7Cmlaker%40altair.com%7Cd4902239bcb74a8fbc5008da30d76211%7C2bae5b570eb848fbba47990259da89d2%7C0%7C0%7C637875998876731914%7CUnknown%7CTWFpbGZsb3d8eyJWIjoiMC4wLjAwMDAiLCJQIjoiV2luMzIiLCJBTiI6Ik1haWwiLCJXVCI6Mn0%3D%7C1000%7C%7C%7C&sdata=Lp%2BI%2FflRrgcaKwTr9PC%2BY4VNrOH5QrOkpO4IpliVWw4%3D&reserved=0
+
+my $rx_extract = qr!
+	^
+	
+	# The prefix carries no useful information:
+	
+	https://
+	[[:alnum:]]+									# Specifies a region
+	\Q.safelinks.protection.outlook.com/?url=\E
+	
+	# The URL we want to extract, terminated by the first '&':
+	
+	( [^&]+ )
+	
+	# Lots of lovely tracking, all of which we discard:
+	
+	.*
+!x;	
+
+sub demunge($) {
+	my ($link) = @_;
+	if ($link =~ s/$rx_extract/$1/) {
+		# We've extracted a safelinks URL.  Now undo percent-encoding:
+		$link =~ s/ \% ( [[:xdigit:]] {2} ) / chr hex $1 /gex;
+	}
+	
+	return $link;
+}
+
+if (@ARGV) {
+	say demunge($_) for @ARGV;
+}
+else {
+	for (;;) {
+		say "Enter a safelinks URL:" if -t STDIN;
+		my $url = <> // last;
+		say demunge($url);
+	}
+}
